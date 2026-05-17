@@ -1,6 +1,7 @@
 import Image from 'next/image';
 import React, { ReactNode } from 'react';
 import { LoginButton } from './login';
+import { McpMenu } from './McpMenu';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
 import { useRouter, usePathname } from 'next/navigation';
@@ -93,6 +94,7 @@ export function Header({
         </div>
 
         <div className='flex items-center gap-2'>
+          <McpMenu />
           {!hideAutoLogin && <LoginButton />}
           {actions}
         </div>
