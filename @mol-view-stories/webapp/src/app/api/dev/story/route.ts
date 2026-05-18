@@ -21,9 +21,16 @@ export async function PATCH(req: NextRequest) {
   const auth = requireSession(req);
   if ('error' in auth) return auth.error;
   const body = (await req.json()) as Partial<Story>;
-  const { title, author_note, story_js, settings } = body;
-  const patched = await patchStory(auth.sessionId, { title, author_note, story_js, settings });
-  return NextResponse.json(patched);
+  // Only forward fields the client actually sent — destructuring with default
+  // undefined would clobber existing values via the spread in patchStory.
+  // `scenes` and `updatedAt` are intentionally not patchable here (scenes have
+  // their own routes, updatedAt is server-owned).
+  const patch: Partial<Story> = {};
+  if ('title' in body) patch.title = body.title;
+  if ('author_note' in body) patch.author_note = body.author_note;
+  if ('story_js' in body) patch.story_js = body.story_js;
+  if ('settings' in body) patch.settings = body.settings;
+  return NextResponse.json(await patchStory(auth.sessionId, patch));
 }
 
 export async function PUT(req: NextRequest) {

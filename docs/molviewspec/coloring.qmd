@@ -1,0 +1,141 @@
+# Coloring and Selectors
+
+::: {.callout-important}
+## Read this before you write any `.color(...)` or `.component({ selector })` call
+
+The MVS API is strictly schema-validated. Two specific mistakes trip up LLMs and humans alike:
+
+1. Treating `"helix"`, `"sheet"`, `"coil"` as **component selectors**. They are not.
+2. Treating `"element-symbol"`, `"by-element"`, `"chain-id"` as **color values**. They are not.
+
+This page documents the exact, exhaustive list of what works.
+:::
+
+## The component selector enum is exhaustive
+
+`selector` accepts **exactly one of these nine strings** (the `ComponentSelectorT` type):
+
+```text
+'all' | 'polymer' | 'protein' | 'nucleic' | 'branched'
+      | 'ligand'  | 'ion'     | 'water'   | 'coarse'
+```
+
+Anything else — `'helix'`, `'sheet'`, `'binding_site'`, `'active_site'`, `'chain_A'`, `'residues_5_to_20'` — **will fail validation**. There are no aliases, no synonyms, no case-insensitive matching.
+
+If you need finer slicing, the `selector` parameter also accepts a **ComponentExpression** (or array of them) — a structured object pointing at specific atoms / residues / chains:
+
+```js
+// Color residues 5..20 of chain A
+structure
+  .component({ selector: 'protein' })
+  .representation({ type: 'cartoon' })
+  .color({
+    selector: { auth_asym_id: 'A', beg_auth_seq_id: 5, end_auth_seq_id: 20 },
+    color: '#e74c3c',
+  });
+```
+
+The full set of fields a ComponentExpression accepts:
+
+```text
+label_entity_id, label_asym_id, auth_asym_id,
+label_seq_id, auth_seq_id, pdbx_PDB_ins_code,
+beg_label_seq_id, end_label_seq_id, beg_auth_seq_id, end_auth_seq_id,
+label_comp_id, auth_comp_id, residue_index,
+label_atom_id, auth_atom_id, type_symbol,
+atom_id, atom_index, instance_id
+```
+
+`type_symbol` is the element name (e.g. `'C'`, `'N'`, `'O'`); useful for "color all carbons" without invoking a palette.
+
+## Coloring options
+
+### 1. Fixed color (named or hex)
+
+```js
+representation.color({ color: 'green' });
+representation.color({ color: '#cc3399' });
+representation.color({ color: 'orange', selector: 'ligand' });
+```
+
+Named CSS colors and `#RRGGBB` strings work. **`'element-symbol'`, `'by-element'`, `'by-chain'` do not** — they look like CSS values but aren't.
+
+### 2. Slice + color (the secondary-structure pattern)
+
+For secondary structure, B-factor regions, or any per-residue/per-chain palette you can enumerate, define ComponentExpression slices and call `.color(...)` once per slice:
+
+```js
+const helices = [
+  { auth_asym_id: 'A', beg_auth_seq_id: 12, end_auth_seq_id: 24 },
+  { auth_asym_id: 'A', beg_auth_seq_id: 56, end_auth_seq_id: 71 },
+];
+const sheets = [
+  { auth_asym_id: 'A', beg_auth_seq_id: 30, end_auth_seq_id: 38 },
+];
+
+structure
+  .component({ selector: 'protein' })
+  .representation({ type: 'cartoon' })
+  .color({ color: '#bdc3c7' })                  // default for the rest
+  .color({ selector: helices, color: '#e74c3c' })
+  .color({ selector: sheets,  color: '#f1c40f' });
+```
+
+Notice the pattern: a default `.color(...)` first, then per-region overrides. The order matters; later calls win.
+
+### 3. Color from the same file (`colorFromSource`)
+
+If the structure was loaded from an mmCIF/BinaryCIF that already contains an annotation column (DSSP secondary structure, pLDDT scores, custom labels), point `colorFromSource` at it:
+
+```js
+const struct = builder
+  .download({ url: '...some_with_annotation.cif' })
+  .parse({ format: 'mmcif' })
+  .modelStructure({});
+
+struct
+  .component({ selector: 'polymer' })
+  .representation({ type: 'cartoon' })
+  .colorFromSource({
+    schema: 'residue',
+    category_name: 'pdbx_struct_conf',  // CIF category to read
+    field_name: 'conf_type_id',         // column with the value
+  });
+```
+
+Valid `schema` values are exactly:
+
+```text
+'whole_structure' | 'entity' | 'chain' | 'auth_chain'
+                  | 'residue' | 'auth_residue'
+                  | 'residue_range' | 'auth_residue_range'
+                  | 'atom' | 'auth_atom' | 'all_atomic'
+```
+
+### 4. Color from an external annotation file (`colorFromUri`)
+
+Same shape as `colorFromSource` but reads from a separate URL — useful when the structure file doesn't include the annotation:
+
+```js
+struct
+  .component({ selector: 'polymer' })
+  .representation({ type: 'cartoon' })
+  .colorFromUri({
+    uri: 'https://example.org/my_annotation.json',
+    schema: 'residue',
+  });
+```
+
+## Common asks and the right way to do them
+
+| You want… | Wrong | Right |
+|---|---|---|
+| Color polymer by element | `.color({ color: 'element-symbol' })` | Use `ball_and_stick` representation; molstar's default is element-coloring. For a custom palette, use a ComponentExpression with `type_symbol` slices. |
+| Color helices red, sheets yellow | `.color({ selector: 'helix', color: 'red' })` | Either define helix ComponentExpressions yourself (see pattern #2) or load a structure with DSSP annotation and use `colorFromSource`. |
+| Color by chain | `.color({ color: 'by-chain' })` | One `.color({selector: {auth_asym_id: 'A'}, color: '...'})` call per chain, or `colorFromSource` with `schema: 'auth_chain'`. |
+| Color by pLDDT | `.color({ color: 'plddt' })` | `colorFromSource({ schema: 'residue', field_name: 'pLDDT', palette: {...} })` on an AlphaFold mmCIF. |
+| Highlight binding site | `.component({ selector: 'binding_site' })` | `.component({ selector: <ComponentExpression with residue list> })`. |
+
+## Validation safety net
+
+Every value above is checked at scene-evaluation time. Use `scene_validate` (MCP tool) or the editor's Apply button to catch a wrong enum or misspelled key — the error messages enumerate the valid alternatives.
