@@ -19,7 +19,16 @@ import { NextRequest, NextResponse } from 'next/server';
 import { randomBytes } from 'node:crypto';
 
 const SESSION_TTL_MS = 24 * 60 * 60 * 1000; // 24h idle
-const sessions = new Map<string, { createdAt: number; lastSeenAt: number }>();
+
+// Pinned to globalThis for the same reason as the dev-store map: `next dev`
+// re-instantiates modules as it lazily compiles routes, so a plain const map
+// would drop every live session the first time a client hits a route that
+// hasn't been compiled yet — the user sees a spurious 401 mid-conversation.
+type SessionRecord = { createdAt: number; lastSeenAt: number };
+const globalForSessions = globalThis as typeof globalThis & {
+  __mvsDevSessions?: Map<string, SessionRecord>;
+};
+const sessions: Map<string, SessionRecord> = (globalForSessions.__mvsDevSessions ??= new Map());
 
 export interface SessionInfo {
   id: string;

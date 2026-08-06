@@ -36,7 +36,14 @@ export interface Story {
   updatedAt: number;
 }
 
-const stories = new Map<string, Story>();
+// Pinned to globalThis, not a plain module-level const: `next dev` compiles
+// route handlers lazily and re-instantiates the module graph as new routes
+// come online, which would silently reset the store the first time an MCP
+// client touches a route nobody has hit yet. The global survives that.
+const globalForStore = globalThis as typeof globalThis & {
+  __mvsDevStories?: Map<string, Story>;
+};
+const stories: Map<string, Story> = (globalForStore.__mvsDevStories ??= new Map());
 
 function emptyStory(): Story {
   return {
