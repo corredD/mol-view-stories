@@ -37,10 +37,7 @@ async function getBuilderSnapshot() {
   const mvs: any = await import('molstar/lib/extensions/mvs/mvs-data');
   const root = mvs.MVSData.createBuilder();
 
-  const structure = root
-    .download({ url: 'about:blank' })
-    .parse({ format: 'mmcif' })
-    .modelStructure({});
+  const structure = root.download({ url: 'about:blank' }).parse({ format: 'mmcif' }).modelStructure({});
   const component = structure.component({ selector: 'all' });
   const representation = component.representation({ type: 'cartoon' });
   const volume = root.download({ url: 'about:blank' }).parse({ format: 'bcif' }).volume({});
@@ -88,7 +85,12 @@ function signatureOf(obj: unknown, methodName: string): { params: string[]; sour
   const src = fn.toString();
   // Best-effort param extraction from the function's source.
   const m = src.match(/^[^(]*\(([^)]*)\)/);
-  const params = m ? m[1].split(',').map((p: string) => p.trim()).filter(Boolean) : [];
+  const params = m
+    ? m[1]
+        .split(',')
+        .map((p: string) => p.trim())
+        .filter(Boolean)
+    : [];
   // Truncate the source to keep responses small.
   return { params, source: src.slice(0, 600) };
 }

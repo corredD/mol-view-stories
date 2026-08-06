@@ -84,7 +84,8 @@ function walk(rootAbs: string, dir: string, out: DocInfo[]): void {
     const abs = path.join(dir, entry.name);
     if (entry.isDirectory()) {
       // Skip non-content dirs (assets, images, JS samples included by qmd pages).
-      if (entry.name === 'assets' || entry.name === 'img' || entry.name === 'js' || entry.name.startsWith('_')) continue;
+      if (entry.name === 'assets' || entry.name === 'img' || entry.name === 'js' || entry.name.startsWith('_'))
+        continue;
       walk(rootAbs, abs, out);
       continue;
     }

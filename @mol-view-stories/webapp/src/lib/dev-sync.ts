@@ -28,11 +28,22 @@ export function devApiUrl(path: string): string {
   return `${base}${path}`;
 }
 
-/** Merge a dev-store story onto the current editor story, preserving UUIDs and assets. */
+/**
+ * Merge a dev-store story onto the current editor story, preserving UUIDs and assets.
+ *
+ * Editor-only fields the dev shape doesn't model — `assets`, and the UI builder
+ * state added by the state-builder integration — are carried over from `current`
+ * rather than dropped, otherwise every MCP edit would wipe them. Scene-level UI
+ * state is matched by `key`, same as the UUIDs.
+ */
 export function applyDevStoryToEditor(dev: DevStory, current: EditorStory): EditorStory {
   const idByKey = new Map<string, string>();
+  const uiStateByKey = new Map<string, SceneData['ui_builder_state']>();
   for (const s of current.scenes) {
-    if (s.key) idByKey.set(s.key, s.id);
+    if (s.key) {
+      idByKey.set(s.key, s.id);
+      if (s.ui_builder_state) uiStateByKey.set(s.key, s.ui_builder_state);
+    }
   }
   const scenes: SceneData[] = dev.scenes.map((s) => ({
     id: idByKey.get(s.key) ?? UUID.createv4(),
@@ -43,6 +54,7 @@ export function applyDevStoryToEditor(dev: DevStory, current: EditorStory): Edit
     linger_duration_ms: s.linger_duration_ms,
     transition_duration_ms: s.transition_duration_ms,
     camera: (s.camera as SceneData['camera']) ?? null,
+    ui_builder_state: uiStateByKey.get(s.key),
   }));
   return {
     metadata: {
@@ -52,6 +64,7 @@ export function applyDevStoryToEditor(dev: DevStory, current: EditorStory): Edit
     javascript: dev.story_js ?? '',
     scenes,
     assets: current.assets ?? [],
+    ui_builder_constants: current.ui_builder_constants,
   };
 }
 

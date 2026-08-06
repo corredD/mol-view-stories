@@ -109,14 +109,16 @@ function renderStoryYaml(story: ReturnType<typeof readStory> extends Promise<inf
   return lines.join('\n') + '\n';
 }
 
-function renderSceneYaml(
-  sc: { key: string; name: string; linger_duration_ms?: number; transition_duration_ms?: number }
-): string {
+function renderSceneYaml(sc: {
+  key: string;
+  name: string;
+  linger_duration_ms?: number;
+  transition_duration_ms?: number;
+}): string {
   const lines: string[] = [];
   lines.push(`name: ${JSON.stringify(sc.name)}`);
   lines.push(`key: ${JSON.stringify(sc.key)}`);
   if (sc.linger_duration_ms != null) lines.push(`linger_duration_ms: ${sc.linger_duration_ms}`);
-  if (sc.transition_duration_ms != null)
-    lines.push(`transition_duration_ms: ${sc.transition_duration_ms}`);
+  if (sc.transition_duration_ms != null) lines.push(`transition_duration_ms: ${sc.transition_duration_ms}`);
   return lines.join('\n') + '\n';
 }

@@ -20,13 +20,7 @@ import { useEffect, useRef } from 'react';
 import { getDefaultStore } from 'jotai';
 import { devFetch } from '@/lib/dev-session';
 import { StoryAtom } from '@/app/state/atoms';
-import {
-  applyDevStoryToEditor,
-  devApiUrl,
-  devStoryFingerprint,
-  editorStoryToDev,
-  type DevStory,
-} from '@/lib/dev-sync';
+import { applyDevStoryToEditor, devApiUrl, devStoryFingerprint, editorStoryToDev, type DevStory } from '@/lib/dev-sync';
 
 export function DevSyncListener() {
   const lastFingerprint = useRef<string | null>(null);

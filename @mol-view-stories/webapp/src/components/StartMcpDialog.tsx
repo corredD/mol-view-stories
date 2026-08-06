@@ -69,10 +69,9 @@ export function StartMcpDialog({ open, onOpenChange }: StartMcpDialogProps) {
         <DialogHeader>
           <DialogTitle>Start MCP</DialogTitle>
           <DialogDescription>
-            Paste this prompt into a Claude conversation that has the mol-view-stories
-            MCP server enabled. Claude will call <code>auth_set</code> once and then drive
-            this editor for the rest of the chat. The token is tied to this browser tab —
-            both ends share the same editing slot on the server.
+            Paste this prompt into a Claude conversation that has the mol-view-stories MCP server enabled. Claude will
+            call <code>auth_set</code> once and then drive this editor for the rest of the chat. The token is tied to
+            this browser tab — both ends share the same editing slot on the server.
           </DialogDescription>
         </DialogHeader>
 
@@ -84,12 +83,7 @@ export function StartMcpDialog({ open, onOpenChange }: StartMcpDialogProps) {
                 Copy
               </Button>
             </div>
-            <Textarea
-              readOnly
-              rows={3}
-              value={prompt || (loading ? 'Loading…' : '')}
-              className='font-mono text-xs'
-            />
+            <Textarea readOnly rows={3} value={prompt || (loading ? 'Loading…' : '')} className='font-mono text-xs' />
           </div>
 
           <div>
@@ -101,9 +95,8 @@ export function StartMcpDialog({ open, onOpenChange }: StartMcpDialogProps) {
             </div>
             <Textarea readOnly rows={2} value={token} className='font-mono text-xs break-all' />
             <p className='text-xs text-muted-foreground mt-1'>
-              Anyone with this token can drive your editing slot, so don't share screenshots.
-              The session lasts up to 24h idle; click <strong>New session</strong> to invalidate
-              and rotate.
+              Anyone with this token can drive your editing slot, so don&apos;t share screenshots. The session lasts up
+              to 24h idle; click <strong>New session</strong> to invalidate and rotate.
             </p>
           </div>
         </div>

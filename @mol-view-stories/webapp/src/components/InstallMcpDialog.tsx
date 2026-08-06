@@ -25,8 +25,7 @@ interface InstallMcpDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
-const MCP_SOURCE_HINT =
-  'Get the mvs-mcp source from the project repository, then build it locally:';
+const MCP_SOURCE_HINT = 'Get the mvs-mcp source from the project repository, then build it locally:';
 
 const BUILD_STEPS = `git clone <mvs-mcp repository URL>
 cd mvs-mcp/mcp-server
@@ -59,7 +58,7 @@ export function InstallMcpDialog({ open, onOpenChange }: InstallMcpDialogProps) 
     return `${window.location.origin}${prefix}`;
   }, []);
   const snippet = useMemo(() => configFor(baseUrl), [baseUrl]);
-  const [_tick, setTick] = useState(0); // force-rerender on copy for the toast
+  const [, setTick] = useState(0); // force-rerender on copy for the toast
 
   const copy = async (text: string, label: string) => {
     try {
@@ -75,8 +74,8 @@ export function InstallMcpDialog({ open, onOpenChange }: InstallMcpDialogProps) 
     typeof navigator !== 'undefined' && navigator.platform.toLowerCase().includes('mac')
       ? '~/Library/Application Support/Claude/claude_desktop_config.json'
       : typeof navigator !== 'undefined' && navigator.platform.toLowerCase().includes('win')
-      ? '%APPDATA%\\Claude\\claude_desktop_config.json'
-      : '~/.config/Claude/claude_desktop_config.json';
+        ? '%APPDATA%\\Claude\\claude_desktop_config.json'
+        : '~/.config/Claude/claude_desktop_config.json';
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -84,8 +83,8 @@ export function InstallMcpDialog({ open, onOpenChange }: InstallMcpDialogProps) 
         <DialogHeader>
           <DialogTitle>Install MCP in Claude Desktop</DialogTitle>
           <DialogDescription>
-            One-time setup. After this, use <strong>Start MCP</strong> each time you want to
-            connect a new Claude conversation to this editor.
+            One-time setup. After this, use <strong>Start MCP</strong> each time you want to connect a new Claude
+            conversation to this editor.
           </DialogDescription>
         </DialogHeader>
 
@@ -103,9 +102,9 @@ export function InstallMcpDialog({ open, onOpenChange }: InstallMcpDialogProps) 
 
           <li>
             <p className='mb-2'>
-              Add this entry to <code className='text-xs'>{configPath}</code> (create the file if
-              it doesn't exist). Replace the <code>args</code> path with the absolute path to your
-              built <code>dist/index.js</code>.
+              Add this entry to <code className='text-xs'>{configPath}</code> (create the file if it doesn&apos;t
+              exist). Replace the <code>args</code> path with the absolute path to your built <code>dist/index.js</code>
+              .
             </p>
             <div className='flex items-center justify-end mb-1'>
               <Button size='sm' variant='outline' onClick={() => copy(snippet, 'Config')}>
@@ -114,18 +113,16 @@ export function InstallMcpDialog({ open, onOpenChange }: InstallMcpDialogProps) 
             </div>
             <Textarea readOnly rows={12} value={snippet} className='font-mono text-xs' />
             <p className='text-xs text-muted-foreground mt-1'>
-              If you already have <code>mcpServers</code> entries, merge the <code>mvs</code> key
-              into your existing object rather than replacing the file.
+              If you already have <code>mcpServers</code> entries, merge the <code>mvs</code> key into your existing
+              object rather than replacing the file.
             </p>
           </li>
 
-          <li>
-            Quit and re-open Claude Desktop. It picks up MCP servers only on startup.
-          </li>
+          <li>Quit and re-open Claude Desktop. It picks up MCP servers only on startup.</li>
 
           <li>
-            Back here, open <strong>Start MCP</strong> from the same menu, copy the prompt, paste
-            it into a Claude conversation. From then on, Claude can drive this editor for you.
+            Back here, open <strong>Start MCP</strong> from the same menu, copy the prompt, paste it into a Claude
+            conversation. From then on, Claude can drive this editor for you.
           </li>
         </ol>
 
