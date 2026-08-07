@@ -89,11 +89,15 @@ Server-state (saved stories, sessions, user quota) uses TanStack Query (`hooks/u
 
 `NEXT_PUBLIC_DEV_API=1` exposes a per-process, in-memory HTTP API at `/api/dev/*` so an external MCP server can drive the editor. When this flag is on, `next.config.ts` disables `output: "export"` (route handlers are incompatible with static export).
 
+- **Route files are named `route.dev.ts`, not `route.ts`.** `next.config.ts` only puts `"dev.ts"` in `pageExtensions` when the flag is on, so with the flag off Next never collects them and the default static-export build stays green. Naming one `route.ts` breaks `pnpm build` for everyone.
 - Auth is opaque session IDs, not OIDC. Mint with `POST /api/dev/session`; clients send `Authorization: Bearer <id>` or `?token=<id>`. See `lib/dev-auth.ts` (server) and `lib/dev-session.ts` (browser).
 - Store is process memory only (`lib/dev-store.ts`); dies on restart. Saved/published stories use the OIDC + Flask + MinIO path instead — these are deliberately separate flows.
-- `DevSyncListener` / `DevSyncMount` keep the live editor tab in sync with the dev-store between MCP edits.
+- Both the session map and the story map are pinned to `globalThis`. `next dev` re-instantiates modules as it lazily compiles routes, and plain module-level state gets wiped the first time a client hits a cold route.
+- `DevSyncListener` / `DevSyncMount` keep the live editor tab in sync with the dev-store between MCP edits. `dev-sync.ts` must carry over editor-only fields (`assets`, `ui_builder_state`, `ui_builder_constants`) from the current story, since the dev shape doesn't model them.
 
-When adding a `/api/dev/*` route, gate it with `isDevEnabled()` (return 404 otherwise) and call `requireSession(req)` before touching the store.
+When adding a `/api/dev/*` route: name it `route.dev.ts`, gate it with `isDevEnabled()` (return 404 otherwise), and call `requireSession(req)` before touching the store.
+
+Note `trailingSlash: true` — `/api/dev/story` 308-redirects to `/api/dev/story/`. `fetch` follows that transparently, but `curl` needs the slash (or `-L`) or a POST body silently goes nowhere.
 
 ### Routing / basePath
 
