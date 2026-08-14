@@ -13,7 +13,9 @@ export interface MonacoInstance {
     typescript: {
       javascriptDefaults: {
         setEagerModelSync(value: boolean): void;
-        getExtraLibs(): Record<string, unknown>;
+        /** Monaco returns `{ [filePath]: { content, version } }`; `content` is what lets a caller
+         * tell whether an already-registered lib is still up to date. */
+        getExtraLibs(): Record<string, { content?: string }>;
         addExtraLib(content: string, filePath: string): void;
         setCompilerOptions(options: Record<string, unknown>): void;
         setDiagnosticsOptions(options: {
@@ -87,8 +89,11 @@ export function setupMonacoCodeCompletion(monaco: MonacoInstance, mvsTypes?: str
 
   const extraLibs = monaco.languages.typescript.javascriptDefaults.getExtraLibs();
 
-  // Add MVS types if provided and not already added
-  if (mvsTypes && !('ts:mvs.d.ts' in extraLibs)) {
+  // Add MVS types if provided. `javascriptDefaults` is a singleton for the lifetime of the page,
+  // so re-register only when the content actually changed: skipping unconditionally would pin the
+  // first version for the whole session (stale IntelliSense against a rebuilt molstar after
+  // `make link` + `make types`), while re-adding every remount thrashes the type checker.
+  if (mvsTypes && extraLibs['ts:mvs.d.ts']?.content !== mvsTypes) {
     monaco.languages.typescript.javascriptDefaults.addExtraLib(mvsTypes, 'ts:mvs.d.ts');
   }
 
