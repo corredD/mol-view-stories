@@ -443,6 +443,8 @@ scene. The marker `//---scene---` is your reference.
 | Situation | Call |
 |---|---|
 | Start of session | `story_get` (always — know what's already there) |
+| User needs to *see* your work | `editor_open` — give them the URL it returns |
+| Before writing any non-trivial scene | `mvs_skill_get` (this file) |
 | Need a curated starting point | `example_list` → `example_load({ name })` |
 | Unsure a method exists | `builder_list_methods({ node })` |
 | Need an exact signature | `mvs_types_get({ node, method })` |

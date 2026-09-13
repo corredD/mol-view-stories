@@ -20,6 +20,9 @@ set -euo pipefail
 HOST="${MVS_DEPLOY_HOST:-autin@mesoscope.scripps.edu}"
 REMOTE_ROOT="${MVS_DEPLOY_ROOT:-/opt/mol-view-stories}"
 BASE_PATH="${MVS_BASE_PATH:-/mvs}"
+# Used verbatim for the pairing link and export downloads handed to the user,
+# so it must be the public URL, not whatever Host the proxy forwards.
+PUBLIC_URL="${MVS_PUBLIC_URL:-https://mesoscope.scripps.edu$BASE_PATH}"
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 WEBAPP="$REPO/@mol-view-stories/webapp"
@@ -70,6 +73,7 @@ ssh "$HOST" "cat > '$STAGE/app/@mol-view-stories/webapp/.env.local' <<ENV
 NEXT_PUBLIC_DEV_API=1
 NEXT_PUBLIC_BASE_PATH=$BASE_PATH
 MVS_REFERENCE_ROOT=$REMOTE_ROOT/reference
+MVS_PUBLIC_URL=$PUBLIC_URL
 ENV"
 
 if [ "${1:-}" != "--activate" ]; then

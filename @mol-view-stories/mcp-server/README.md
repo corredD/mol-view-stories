@@ -68,6 +68,10 @@ Set `MVS_DEV_TOKEN` (or install with `--header "Authorization: Bearer <token>"`)
 to reuse one specific session across conversations instead. Grab the token from
 **Pin this editing session** in the app's MCP menu.
 
+Sessions live in server memory, so a pinned token survives reconnects and the 24h
+idle TTL but **not a server restart** — after one, the token is unknown and the
+next connection silently gets a fresh, empty story.
+
 ## Local development
 
 ```bash

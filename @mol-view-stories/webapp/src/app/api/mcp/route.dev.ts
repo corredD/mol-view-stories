@@ -81,10 +81,19 @@ function resolveSession(req: NextRequest): { sessionId: string; minted: boolean 
 
 /**
  * Origin + basePath as the *user's browser* would reach it, for links we hand
- * back (the pairing URL, export downloads). Behind the reverse proxy in front of
- * this app, the forwarded headers are the only accurate source.
+ * back (the pairing URL, export downloads).
+ *
+ * MVS_PUBLIC_URL wins when set, and a deploy behind a reverse proxy should set
+ * it. The header sniffing below is a best guess: if the proxy doesn't forward
+ * x-forwarded-* we fall back to Host, which on this deploy is `127.0.0.1:3000`
+ * — and a pairing link pointing at loopback is useless to the user. The pairing
+ * link is the entire point of editor_open, so it should not depend on how a
+ * proxy happens to be configured.
  */
 function publicBaseUrl(req: NextRequest): string {
+  const configured = process.env.MVS_PUBLIC_URL?.replace(/\/+$/, '');
+  if (configured) return configured;
+
   const proto = req.headers.get('x-forwarded-proto')?.split(',')[0]?.trim();
   const host = req.headers.get('x-forwarded-host')?.split(',')[0]?.trim() ?? req.headers.get('host');
   const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? '';
@@ -206,7 +215,14 @@ export async function GET() {
   return new NextResponse('Method Not Allowed', { status: 405, headers: { Allow: 'POST, DELETE' } });
 }
 
-/** Spec-defined way for a client to end its session. */
+/**
+ * Spec-defined way for a client to end its session.
+ *
+ * Note this discards the story, not just the token: a client that tears sessions
+ * down per spec will wipe work the user's browser tab may still be showing.
+ * Claude Code never sends DELETE, so this is latent rather than live, but any
+ * change here should keep that in mind.
+ */
 export async function DELETE(req: NextRequest) {
   if (!isDevEnabled()) return notFound();
   const existing = resolveSession(req);
