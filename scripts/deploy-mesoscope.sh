@@ -31,11 +31,29 @@ LIVE="$REMOTE_ROOT/mol-view-stories"
 
 say() { printf '\n\033[1m==> %s\033[0m\n' "$*"; }
 
-say "Building standalone bundle (basePath=$BASE_PATH)"
+# NEXT_PUBLIC_* values are inlined at build time, so this has to be decided here
+# rather than in the remote .env.local the service reads. Left to .env.local it
+# depends on whatever the build machine happens to have, which is exactly the
+# non-reproducibility this script exists to remove.
+#
+# It is a public/-relative path; localStoriesUrl() prepends basePath. Empty means
+# the preview loads mvs-stories from jsDelivr, which is correct unless a story
+# needs an unreleased molstar feature.
+if [ -d "$WEBAPP/public/mvs-stories" ]; then
+  STORIES_BASE="${MVS_STORIES_BASE:-/mvs-stories}"
+else
+  STORIES_BASE="${MVS_STORIES_BASE:-}"
+  # public/mvs-stories/ is gitignored and no build step produces it: it is copied
+  # in by hand from a molstar / molstar-components build. A fresh clone has none.
+  echo "    note: public/mvs-stories/ absent, preview will use the jsDelivr bundle" >&2
+fi
+
+say "Building standalone bundle (basePath=$BASE_PATH, stories=${STORIES_BASE:-jsDelivr})"
 cd "$WEBAPP"
 MVS_BUILD_STANDALONE=1 \
 NEXT_PUBLIC_DEV_API=1 \
 NEXT_PUBLIC_BASE_PATH="$BASE_PATH" \
+NEXT_PUBLIC_MVS_STORIES_BASE="$STORIES_BASE" \
 NODE_ENV=production \
   pnpm build
 
