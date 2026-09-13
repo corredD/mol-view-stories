@@ -1,6 +1,23 @@
 import type { MVSData } from 'molstar/lib/extensions/mvs/mvs-data';
 import { PLUGIN_VERSION } from 'molstar/lib/mol-plugin/version';
 
+function bytesToBase64(data: Uint8Array): string {
+  const nativeToBase64 = (data as Uint8Array & { toBase64?: () => string }).toBase64;
+  if (nativeToBase64) return nativeToBase64.call(data);
+
+  // Keep chunks divisible by three so concatenating the independently encoded
+  // chunks does not introduce padding in the middle of the result.
+  const chunkSize = 3 * 8192;
+  const chunks: string[] = [];
+  for (let offset = 0; offset < data.length; offset += chunkSize) {
+    const end = Math.min(offset + chunkSize, data.length);
+    let binary = '';
+    for (let i = offset; i < end; i++) binary += String.fromCharCode(data[i]);
+    chunks.push(btoa(binary));
+  }
+  return chunks.join('');
+}
+
 export function generateStoriesHtml(
   data:
     | { kind: 'embed'; data: MVSData | Uint8Array }
@@ -38,9 +55,7 @@ export function generateStoriesHtml(
 
     let state;
     if (data.data instanceof Uint8Array) {
-      state = `"base64,${
-        (data.data as unknown as { toBase64(): string }).toBase64()
-      }"`;
+      state = `"base64,${bytesToBase64(data.data)}"`;
     } else {
       state = JSON.stringify(data.data);
     }
@@ -161,7 +176,7 @@ const Template = `<!DOCTYPE html>
         <mvs-stories-viewer></mvs-stories-viewer>
     </div>
     <div id="controls">
-        <mvs-stories-snapshot-markdown style="flex-grow: 1;"></ mvs-stories-snapshot-markdown>
+        <mvs-stories-snapshot-markdown style="flex-grow: 1;"></mvs-stories-snapshot-markdown>
     </div>
 
     <div id="links">

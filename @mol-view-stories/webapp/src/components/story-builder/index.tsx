@@ -8,7 +8,7 @@ import { Header } from '@/components/common';
 import { StoriesToolBar } from '@/components/story-builder/Toolbar';
 import { getMVSData, setIsDirty } from '@/app/state/actions';
 import { loadSession, loadSessionFromUrl, resolvePublishedSessionUrl } from '@/lib/my-stories-api';
-import { generateStoriesHtml } from '@mol-view-stories/lib';
+import { generateStoriesHtml, localStoriesUrl } from '@mol-view-stories/lib';
 import { StoryActionButtons } from './Actions';
 import { useUnsavedChanges, useUnsavedChangesWarning } from '@/hooks/useUnsavedChanges';
 
@@ -140,42 +140,65 @@ function StoryBuilderRoot() {
 function StoryPreview() {
   const story = useAtomValue(StoryAtom);
   const [src, setSrc] = useState<string | undefined>(undefined);
+  const [error, setError] = useState<string | undefined>(undefined);
 
   useLayoutEffect(() => {
     let isMounted = true;
+    const objectUrls: string[] = [];
 
     async function build() {
       try {
+        setError(undefined);
         const data = await getMVSData(story);
         if (!isMounted) return;
 
+        const jsPath = localStoriesUrl('js');
+        const cssPath = localStoriesUrl('css');
         const htmlContent = generateStoriesHtml(
-          {
-            kind: 'embed',
-            data:
-              data instanceof Uint8Array
-                ? new Uint8Array(data.buffer as ArrayBuffer, data.byteOffset, data.byteLength)
-                : data,
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          } as any,
+          data instanceof Uint8Array
+            ? (() => {
+                // Avoid base64-encoding large asset-backed stories into the HTML.
+                // A blob URL keeps one binary copy and lets the iframe fetch it
+                // through the same loadFromURL path as a self-hosted package.
+                const dataSrc = URL.createObjectURL(new Blob([data as Uint8Array<ArrayBuffer>]));
+                objectUrls.push(dataSrc);
+                return { kind: 'self-hosted', dataPath: dataSrc, format: 'mvsx' } as const;
+              })()
+            : { kind: 'embed', data },
           {
             title: story.metadata.title,
+            // Without these the preview iframe loads mvs-stories from jsDelivr,
+            // i.e. the *published* molstar -- which rejects MVS features that
+            // only exist in a local checkout (an unreleased `parse` format shows
+            // up as a format error). Undefined when unconfigured, which restores
+            // the CDN default.
+            jsPath,
+            cssPath,
           }
         );
         if (typeof window !== 'undefined') {
-          const src = URL.createObjectURL(new Blob([htmlContent], { type: 'text/html' }));
-          setSrc(src);
+          const htmlSrc = URL.createObjectURL(new Blob([htmlContent], { type: 'text/html' }));
+          objectUrls.push(htmlSrc);
+          setSrc(htmlSrc);
         }
       } catch (error) {
         console.error('Failed to build preview:', error);
+        if (isMounted) setError(error instanceof Error ? error.message : String(error));
       }
     }
 
     build();
     return () => {
       isMounted = false;
+      for (const url of objectUrls) URL.revokeObjectURL(url);
     };
   }, [story]);
+
+  if (error) {
+    return (
+      <div className='w-full h-full flex items-center justify-center text-destructive'>Preview failed: {error}</div>
+    );
+  }
 
   if (!src) {
     return <div className='w-full h-full flex items-center justify-center'>Loading preview...</div>;

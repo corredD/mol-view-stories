@@ -41,6 +41,8 @@ export type {
 export {
   adjustedCameraPosition,
   BuilderLibNamespaces,
+  localStoriesBase,
+  localStoriesUrl,
   StoryFileExtension,
 } from './src/utils.ts';
 

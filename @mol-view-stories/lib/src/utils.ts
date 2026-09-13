@@ -146,10 +146,62 @@ export async function createCompressedStoryContainer(story: Story): Promise<Uint
 
 const codeCache = new Map<string, Promise<Uint8Array>>();
 
+/**
+ * Base URL of a locally served mvs-stories bundle, e.g. `/mvs-stories`.
+ *
+ * Set NEXT_PUBLIC_MVS_STORIES_BASE to use a bundle built from a local molstar
+ * checkout instead of the published one on jsDelivr. Needed whenever the story
+ * relies on MVS features that are not in a released molstar yet -- an unreleased
+ * `parse` format, for instance, is rejected by the CDN bundle with a format
+ * error even though the app's own scene preview renders it fine.
+ *
+ * Unset (the default) keeps the previous CDN-only behaviour.
+ */
+export function localStoriesBase(): string | undefined {
+  const base = process.env.NEXT_PUBLIC_MVS_STORIES_BASE;
+  if (!base) return undefined;
+  return base.replace(/\/$/, '');
+}
+
+/** Absolute URL for a locally served bundle asset, or undefined if not configured. */
+export function localStoriesUrl(asset: 'js' | 'css'): string | undefined {
+  const base = localStoriesBase();
+  if (!base) return undefined;
+  // An explicit origin is taken as-is: it is already absolute and owes nothing
+  // to how this app happens to be mounted.
+  if (/^https?:\/\//i.test(base)) return `${base}/mvs-stories.${asset}`;
+
+  // The bundle ships in webapp/public, which Next.js serves *under* basePath.
+  // So NEXT_PUBLIC_MVS_STORIES_BASE=/mvs-stories is really /mvs/mvs-stories on
+  // a deploy with NEXT_PUBLIC_BASE_PATH=/mvs. Omitting the prefix requests the
+  // un-prefixed path, gets the web server's 404 HTML back, and the nosniff
+  // MIME check then blocks it -- surfacing only as "mvsStories is not defined".
+  const basePath = (process.env.NEXT_PUBLIC_BASE_PATH ?? '').replace(/\/$/, '');
+  // Absolute: the preview HTML runs in an iframe from a blob: URL, where a
+  // root-relative path has no usable base to resolve against.
+  const origin = typeof window !== 'undefined' ? window.location.origin : '';
+  return `${origin}${basePath}${base}/mvs-stories.${asset}`;
+}
+
 async function downloadStoriesCode(version: string, asset: 'js' | 'css'): Promise<Uint8Array> {
   const cacheKey = `${version}:${asset}`;
   if (codeCache.has(cacheKey)) {
     return codeCache.get(cacheKey)!;
+  }
+
+  const local = localStoriesUrl(asset);
+  if (local) {
+    try {
+      const res = await fetch(local);
+      if (res.ok) {
+        const bytes = new Uint8Array(await res.arrayBuffer());
+        codeCache.set(cacheKey, Promise.resolve(bytes));
+        return bytes;
+      }
+      console.warn(`Local mvs-stories ${asset} not available at ${local}, falling back to CDN.`);
+    } catch (error) {
+      console.warn(`Local mvs-stories ${asset} fetch failed, falling back to CDN.`, error);
+    }
   }
 
   try {
