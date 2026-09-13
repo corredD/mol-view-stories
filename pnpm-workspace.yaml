@@ -1,3 +1,4 @@
 packages:
   - '@mol-view-stories/webapp'
   - '@mol-view-stories/lib'
+  - '@mol-view-stories/mcp-server'

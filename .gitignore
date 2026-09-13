@@ -64,3 +64,10 @@ venv/
 
 .ipynb_checkpoints/
 .idea/
+
+# Local-only story assets: large tomogram/mesh data, not distributed with the repo
+@mol-view-stories/webapp/public/ytc041/
+# Prebuilt mvs-stories viewer bundle, copied in from molstar-components
+@mol-view-stories/webapp/public/mvs-stories/
+@mol-view-stories/mcp-server/node_modules/
+@mol-view-stories/mcp-server/dist/

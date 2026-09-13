@@ -25,13 +25,14 @@ interface InstallMcpDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
-const MCP_SOURCE_HINT = 'Get the mvs-mcp source from the project repository, then build it locally:';
+const MCP_SOURCE_HINT = 'The MCP server ships inside mol-view-stories. Clone the repo and build that one package:';
 
-const BUILD_STEPS = `git clone <mvs-mcp repository URL>
-cd mvs-mcp/mcp-server
-npm install
-npm run build
-# note the absolute path to dist/index.js — you'll paste it below`;
+const BUILD_STEPS = `git clone -b mcp-integration https://github.com/corredD/mol-view-stories.git
+cd mol-view-stories
+pnpm install
+pnpm --filter=@mol-view-stories/mcp-server build
+# the path to paste below is now:
+#   $(pwd)/@mol-view-stories/mcp-server/dist/index.js`;
 
 function configFor(baseUrl: string): string {
   return JSON.stringify(
@@ -39,7 +40,7 @@ function configFor(baseUrl: string): string {
       mcpServers: {
         mvs: {
           command: 'node',
-          args: ['/absolute/path/to/mvs-mcp/mcp-server/dist/index.js'],
+          args: ['/absolute/path/to/mol-view-stories/@mol-view-stories/mcp-server/dist/index.js'],
           env: {
             MVS_DEV_URL: baseUrl,
           },
