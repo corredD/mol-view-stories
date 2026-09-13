@@ -89,6 +89,18 @@ export async function deleteScene(userId: string, key: string): Promise<Story> {
   return writeStory(userId, { ...s, scenes: s.scenes.filter((x) => x.key !== key) });
 }
 
+/**
+ * Forget a session's story.
+ *
+ * Called by the session sweep in dev-auth when a session expires. Before the
+ * MCP endpoint became publicly reachable this didn't matter much — sessions
+ * were minted by hand. Now every new agent conversation mints one, so without
+ * this the map only ever grows.
+ */
+export function dropStory(userId: string): void {
+  stories.delete(userId);
+}
+
 export async function reorderScenes(userId: string, orderedKeys: string[]): Promise<Story> {
   const s = await readStory(userId);
   const map = new Map(s.scenes.map((sc) => [sc.key, sc]));

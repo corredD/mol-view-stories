@@ -8,7 +8,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { isDevEnabled } from '@/lib/dev-store';
 import { requireSession } from '@/lib/dev-auth';
-import { listDocs } from '@/lib/dev-references';
+import { hasReferenceMaterial, listDocs } from '@/lib/dev-references';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -23,5 +23,13 @@ export async function GET(req: NextRequest) {
   if ('error' in auth) return auth.error;
   void auth.sessionId;
   const docs = listDocs().map(({ slug, title }) => ({ slug, title }));
-  return NextResponse.json({ docs });
+  // An empty list means one of two very different things; say which, so an agent
+  // doesn't conclude the docs simply don't exist on a deploy that omits them.
+  return NextResponse.json({
+    docs,
+    reference_available: hasReferenceMaterial(),
+    ...(hasReferenceMaterial()
+      ? {}
+      : { note: 'This deployment ships no docs/ tree. Set MVS_REFERENCE_ROOT on the server to enable them.' }),
+  });
 }

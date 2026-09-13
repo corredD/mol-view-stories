@@ -3,13 +3,14 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
+    "dev": "pnpm gen:skill && next dev",
+    "build": "pnpm gen:skill && next build",
     "start": "next start",
     "lint": "next lint",
     "prettier": "prettier --write ./src",
     "prettier:check": "prettier --check ./src",
-    "tsc:check": "tsc --noEmit"
+    "tsc:check": "tsc --noEmit",
+    "gen:skill": "node scripts/gen-skill.mjs"
   },
   "dependencies": {
     "@mol-view-stories/lib": "workspace:*",

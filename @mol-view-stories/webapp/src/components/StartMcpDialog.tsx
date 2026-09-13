@@ -1,15 +1,19 @@
 'use client';
 
 /**
- * Start MCP dialog
+ * Start MCP dialog — the manual pairing fallback.
  *
- * Hands the user a session token to paste into a Claude prompt so Claude's
- * `auth_set` MCP tool can attach it to every subsequent dev-API call. The
- * token is the same session ID this browser tab is using, so both ends share
- * the in-memory editing slot on the server.
+ * Normally nobody needs this. An agent connected to /api/mcp gets its own
+ * session and calls `editor_open`, which hands the user a link that pairs this
+ * tab with that conversation; nothing is copied by hand.
+ *
+ * This dialog covers the other direction: taking *this tab's* session token and
+ * pinning a client to it, so the same story comes back in every new
+ * conversation. Install the server with
+ * `--header "Authorization: Bearer <token>"` and it will always use this slot.
  *
  * No login required — sessions are minted anonymously on first visit and
- * cached in localStorage. Refresh mints a new one (invalidating the old).
+ * cached in localStorage. "New session" mints a fresh one, invalidating the old.
  */
 
 import { useCallback, useEffect, useState } from 'react';
@@ -52,7 +56,11 @@ export function StartMcpDialog({ open, onOpenChange }: StartMcpDialogProps) {
     if (open) load(false);
   }, [open, load]);
 
-  const prompt = token ? `Use this MCP token: ${token}` : '';
+  // What the user actually needs is an install command carrying the token, not
+  // a sentence to paste into a chat — pinning happens at install time now.
+  const prompt = token
+    ? `claude mcp add --transport http mvs ${typeof window !== 'undefined' ? `${window.location.origin}${process.env.NEXT_PUBLIC_BASE_PATH ?? ''}` : ''}/api/mcp/ --header "Authorization: Bearer ${token}"`
+    : '';
 
   const copy = async (text: string, label: string) => {
     try {
@@ -67,19 +75,19 @@ export function StartMcpDialog({ open, onOpenChange }: StartMcpDialogProps) {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className='sm:max-w-[560px]'>
         <DialogHeader>
-          <DialogTitle>Start MCP</DialogTitle>
+          <DialogTitle>Pin this editing session</DialogTitle>
           <DialogDescription>
-            Paste this prompt into a Claude conversation that has the mol-view-stories MCP server enabled. Claude will
-            call <code>auth_set</code> once and then drive this editor for the rest of the chat. The token is tied to
-            this browser tab — both ends share the same editing slot on the server.
+            You usually don&apos;t need this. Just ask a connected agent to build something — it will send you a link
+            that pairs this tab with the conversation automatically. Use the token below only if you want <em>every</em>{' '}
+            new conversation to reopen this same story.
           </DialogDescription>
         </DialogHeader>
 
         <div className='space-y-3'>
           <div>
             <div className='flex items-center justify-between mb-1'>
-              <label className='text-sm font-medium'>Paste this into Claude</label>
-              <Button size='sm' variant='outline' disabled={!token} onClick={() => copy(prompt, 'Prompt')}>
+              <label className='text-sm font-medium'>Install pinned to this session</label>
+              <Button size='sm' variant='outline' disabled={!token} onClick={() => copy(prompt, 'Command')}>
                 Copy
               </Button>
             </div>

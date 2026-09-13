@@ -22,8 +22,18 @@ const basePath =
   process.env.NEXT_PUBLIC_BASE_PATH ??
   (process.env.NODE_ENV === "production" ? "/mol-view-stories" : "");
 
+// Deploy builds need `output: "standalone"` — that is what produces the
+// server.js the mvs.service systemd unit runs. It cannot simply follow
+// devApiEnabled: a dev-API build run locally should stay a normal `next build`
+// so `pnpm dev:web` and friends behave as usual. So it gets its own flag, and
+// the deploy is reproducible from this repo instead of from whatever config the
+// build machine happened to have.
+const standalone = process.env.MVS_BUILD_STANDALONE === "1";
+
+const output = standalone ? "standalone" : devApiEnabled ? undefined : "export";
+
 const nextConfig: NextConfig = {
-  ...(devApiEnabled ? {} : { output: "export" }),
+  ...(output ? { output } : {}),
   pageExtensions,
   trailingSlash: true,
   basePath,

@@ -12,7 +12,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { isDevEnabled } from '@/lib/dev-store';
 import { requireSession } from '@/lib/dev-auth';
-import { listExamples } from '@/lib/dev-references';
+import { hasReferenceMaterial, listExamples } from '@/lib/dev-references';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -26,5 +26,11 @@ export async function GET(req: NextRequest) {
   const auth = requireSession(req);
   if ('error' in auth) return auth.error;
   void auth.sessionId;
-  return NextResponse.json({ examples: listExamples() });
+  return NextResponse.json({
+    examples: listExamples(),
+    reference_available: hasReferenceMaterial(),
+    ...(hasReferenceMaterial()
+      ? {}
+      : { note: 'This deployment ships no cli/examples tree. Set MVS_REFERENCE_ROOT on the server to enable them.' }),
+  });
 }

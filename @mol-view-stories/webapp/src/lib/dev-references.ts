@@ -8,9 +8,18 @@
  *   2. docs/molviewspec/*.qmd — curated human-written concept primers.
  *   3. cli/examples/* — real, working story folders (inline or folder layout).
  *
- * All paths are resolved from the repo root, located by walking up from
- * process.cwd() looking for pnpm-workspace.yaml. This keeps the lookup robust
- * regardless of where the Next.js process was launched from.
+ * Docs and examples are plain files on disk, resolved from a *reference root*:
+ * MVS_REFERENCE_ROOT if set, otherwise the repo root found by walking up from
+ * process.cwd() looking for pnpm-workspace.yaml.
+ *
+ * A `next build --output standalone` deploy has neither a repo root nor a source
+ * tree, so the walk finds nothing there. It must NOT throw when that happens:
+ * this module used to, which turned five MCP tools (mvs_doc_list, mvs_doc_get,
+ * example_list, example_get, example_load) into 500s on every deployed
+ * instance. Instead we return a path that simply doesn't exist and let the
+ * existsSync guards at each call site degrade to "no docs"/"no examples".
+ * Point MVS_REFERENCE_ROOT at a directory containing docs/ and cli/examples/ to
+ * light them back up.
  */
 
 import fs from 'node:fs';
@@ -19,9 +28,26 @@ import { parse as parseYaml } from 'yaml';
 import { MVSTypes } from '@mol-view-stories/lib';
 import type { Story, Scene } from '@/lib/dev-store';
 
+/** Sentinel for "no reference material in this deployment" — never exists on disk. */
+const NO_REFERENCE_ROOT = path.join(path.sep, 'nonexistent', 'mvs-reference-root');
+
 let cachedRepoRoot: string | null = null;
+
+/**
+ * Directory containing `docs/` and `cli/examples/`.
+ *
+ * May point at a path that does not exist. Callers must guard with existsSync
+ * rather than assuming the contents are there — see the module comment.
+ */
 export function repoRoot(): string {
   if (cachedRepoRoot) return cachedRepoRoot;
+
+  const override = process.env.MVS_REFERENCE_ROOT;
+  if (override && fs.existsSync(override)) {
+    cachedRepoRoot = override;
+    return override;
+  }
+
   let dir = process.cwd();
   for (let i = 0; i < 6; i++) {
     if (fs.existsSync(path.join(dir, 'pnpm-workspace.yaml'))) {
@@ -32,7 +58,14 @@ export function repoRoot(): string {
     if (parent === dir) break;
     dir = parent;
   }
-  throw new Error('could not locate repo root (no pnpm-workspace.yaml found walking up)');
+
+  cachedRepoRoot = NO_REFERENCE_ROOT;
+  return cachedRepoRoot;
+}
+
+/** True when docs/examples are actually reachable, for reporting in tool output. */
+export function hasReferenceMaterial(): boolean {
+  return repoRoot() !== NO_REFERENCE_ROOT;
 }
 
 // ─── MVS types ────────────────────────────────────────────────────────────

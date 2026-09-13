@@ -5,10 +5,18 @@
  *   body: { format: 'mvsj' | 'mvsx' | 'folder' }
  *   -> { ok: true, format, content?: string, files?: Record<string,string> }
  *
+ * GET /api/dev/export?format=mvsj|mvsx&token=<session>
+ *   -> the file itself, as a download.
+ *
  * For mvsj: returns the JSON string.
  * For mvsx: returns base64 of the zip.
  * For folder: returns a map of relative_path -> file contents (so the MCP
  *   server can write the folder layout to disk itself).
+ *
+ * GET exists for the remote MCP server: it runs in the browser-facing process,
+ * not on the user's machine, so it has no filesystem to write `out_dir` into.
+ * Instead it hands back a URL the user can click. `?token=` is accepted here
+ * (see dev-auth) because a download link cannot carry an Authorization header.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -23,12 +31,56 @@ function notFound() {
   return new NextResponse('Not Found', { status: 404 });
 }
 
+type ExportFormat = 'mvsj' | 'mvsx' | 'folder';
+
 export async function POST(req: NextRequest) {
   if (!isDevEnabled()) return notFound();
   const auth = requireSession(req);
   if ('error' in auth) return auth.error;
-  const { format } = (await req.json()) as { format: 'mvsj' | 'mvsx' | 'folder' };
-  const story = await readStory(auth.sessionId);
+  const { format } = (await req.json()) as { format: ExportFormat };
+  return buildExport(auth.sessionId, format);
+}
+
+/** Same export, delivered as a downloadable file rather than a JSON envelope. */
+export async function GET(req: NextRequest) {
+  if (!isDevEnabled()) return notFound();
+  const auth = requireSession(req);
+  if ('error' in auth) return auth.error;
+
+  const format = (new URL(req.url).searchParams.get('format') ?? 'mvsj') as ExportFormat;
+  if (format !== 'mvsj' && format !== 'mvsx') {
+    return NextResponse.json(
+      { error: "GET supports format=mvsj or format=mvsx (use POST for 'folder')" },
+      { status: 400 }
+    );
+  }
+
+  const built = await buildExport(auth.sessionId, format);
+  const payload = (await built.json()) as
+    | { ok: true; format: 'mvsj'; content: string }
+    | { ok: true; format: 'mvsx'; content_base64: string }
+    | { ok: false; error: unknown };
+
+  // A scene that fails to build is a 200-with-ok:false from buildExport; surface
+  // it as JSON rather than handing the browser a file named story.mvsj full of
+  // an error object.
+  if (!payload.ok) return NextResponse.json(payload, { status: 200 });
+
+  const body: Buffer | string =
+    payload.format === 'mvsx' ? Buffer.from(payload.content_base64, 'base64') : payload.content;
+
+  return new NextResponse(body as BodyInit, {
+    status: 200,
+    headers: {
+      'Content-Type': payload.format === 'mvsx' ? 'application/zip' : 'application/json',
+      'Content-Disposition': `attachment; filename="story.${payload.format}"`,
+      'Cache-Control': 'no-store',
+    },
+  });
+}
+
+async function buildExport(sessionId: string, format: ExportFormat): Promise<NextResponse> {
+  const story = await readStory(sessionId);
 
   if (format === 'folder') {
     const files: Record<string, string> = {};

@@ -1,78 +1,79 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this
-package. It is the `@mol-view-stories/mcp-server` workspace package; the repo-wide guidance is
-in the root `CLAUDE.md`.
+Guidance for `@mol-view-stories/mcp-server`. Repo-wide guidance is in the root
+`CLAUDE.md`.
+
+## This package is now a bridge, not the server
+
+The MCP tools used to live here. They don't any more. **They live in the webapp**,
+served over Streamable HTTP from `POST /api/mcp/`:
+
+| What | Where |
+|---|---|
+| Tool registry (names, schemas, descriptions, handlers) | `webapp/src/lib/mcp/tools.ts` |
+| `initialize` instructions handed to the agent | `webapp/src/lib/mcp/instructions.ts` |
+| Transport / JSON-RPC | `webapp/src/app/api/mcp/route.dev.ts` |
+| MVS scripting reference (`mvs_skill_get`) | `SKILLS.md` here, bundled by `webapp/scripts/gen-skill.mjs` |
+| This package | `src/index.ts` — ~95 lines of stdio↔HTTP pump |
+
+They moved because the tools wrap fork-local `/api/dev/*` routes and must version
+with them; co-locating makes that automatic instead of a discipline. **Do not
+re-add tool definitions here.** The bridge forwards `initialize` verbatim, so it
+inherits the tool list and instructions for free and needs no edit when a tool
+changes.
 
 ## Commands
 
-Run from the repo root so pnpm resolves the workspace, or from this directory with `pnpm`:
+```bash
+pnpm --filter @mol-view-stories/mcp-server build   # tsc -> dist/index.js
+pnpm --filter @mol-view-stories/mcp-server dev     # tsx src/index.ts
+```
+
+No tests. `pnpm tsc:check` and `pnpm prettier:check` at the root cover this
+package via `--filter=*`.
+
+The package has **no runtime dependencies** — not even the MCP SDK. It speaks
+raw JSON-RPC over `fetch`. Keep it that way; the whole point is that a
+stdio-only client can run it with nothing installed.
+
+## Editing SKILLS.md
+
+`SKILLS.md` is the long-form MVS-scripting reference served by the `mvs_skill_get`
+tool. It is **not** read from disk at runtime — a `next build --output standalone`
+deploy ships no source tree, so runtime reads of repo files fail there. Instead
+`webapp/scripts/gen-skill.mjs` compiles it into `webapp/src/lib/mcp/skill.generated.ts`,
+and that runs automatically before `dev` and `build`.
+
+So: edit `SKILLS.md` here, then rebuild the webapp. Never edit
+`skill.generated.ts`.
+
+That same standalone-deploy constraint is why `docs/` and `cli/examples/` are
+resolved through `MVS_REFERENCE_ROOT` (see `webapp/src/lib/dev-references.ts`).
+Reading repo files at runtime is the recurring trap in this codebase.
+
+## Debugging
+
+Stdout is the protocol stream. **All diagnostics must go to stderr** — a stray
+`console.log` corrupts the session.
+
+Skip the bridge when isolating a problem; talk to the endpoint directly:
 
 ```bash
-pnpm --filter @mol-view-stories/mcp-server build   # tsc -> dist/index.js (the bin entry)
-pnpm --filter @mol-view-stories/mcp-server dev     # tsx src/index.ts (stdio server directly)
-pnpm --filter @mol-view-stories/mcp-server start   # node dist/index.js (post-build)
+curl -s -X POST http://localhost:3000/api/mcp/ \
+  -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' | jq '.result.tools[].name'
 ```
 
-There is no test suite. Formatting and typechecking come from the workspace gates —
-`pnpm prettier:check` and `pnpm tsc:check` at the root cover this package via
-`--filter=*`, so run them before opening a PR.
+If that works and the bridge doesn't, the bug is here. Otherwise it is in the
+webapp.
 
-After editing `src/index.ts`, run the `build` above to refresh `dist/` — the registered MCP
-binary (`dist/index.js`) is what Claude clients actually launch, so an unbuilt edit changes
-nothing. `dist/` is gitignored.
+Verified client behaviour (Claude Code, 2026-09-13), worth knowing before
+changing the transport:
 
-The webapp that serves the dev API now lives in the same repo, so the end-to-end loop is
-`pnpm dev:web` in one terminal and this server in another. It needs `NEXT_PUBLIC_DEV_API=1`
-in `.env.local` and listens on `MVS_DEV_URL` (default `http://localhost:3000`).
-Sanity-check the backend before debugging the MCP layer:
-
-```bash
-curl http://localhost:3000/api/dev/story
-curl 'http://localhost:3000/api/dev/builder?node=primitives'
-```
-
-## Architecture
-
-```
-Claude client ──stdio──> mvs-mcp (this package) ──HTTP──> @mol-view-stories/webapp ──> .mvs-dev/story.json
-```
-
-The MCP server is intentionally thin: every tool is a wrapper around an HTTP call to a
-`/api/dev/*` route in the webapp. The real MolViewSpec builder, the persistent store, and the
-schema for stories/scenes all live in
-`@mol-view-stories/webapp/src/app/api/dev/` (route files are `route.dev.ts`), not here.
-**When a tool's behavior is wrong, the fix is almost always in those routes, not in
-`src/index.ts`.**
-
-Because the server and the routes it wraps are now versioned together in one repo, a route
-rename and its tool update belong in the same commit.
-
-### `src/index.ts` — the entire server
-
-Everything is in one file:
-
-1. **`api<T>()`** — shared `fetch` helper that prepends `MVS_DEV_URL` and throws on non-2xx with the response body.
-2. **`defineTool()` registry** — each tool is a `{ name, description, inputSchema (zod), handler }` object pushed into a `tools[]` array.
-3. **Two request handlers** — `ListToolsRequestSchema` exposes the registry, `CallToolRequestSchema` looks up the tool, parses args through its zod schema, and returns the handler's string output wrapped in MCP content.
-4. **`zodToJsonSchema()`** — a deliberately minimal in-file converter (object/string/number/boolean/array/enum/optional/effects). No external dep. If you add a tool that needs a zod type not handled here, extend this function rather than pulling in `zod-to-json-schema`.
-5. **Stdio transport boot** — connects `StdioServerTransport` and logs the target URL. Stdio MCP servers cannot use `console.log`; **all diagnostics must go to `process.stderr`**, otherwise they corrupt the protocol stream.
-
-### Tool surface (and what the descriptions are doing)
-
-The 19 tools cover auth, story-level CRUD, scene-level CRUD, validation, builder introspection, and export. The tool **descriptions** are prompt-engineered for the LLM caller — e.g. `story_get` tells Claude to "Always start a session with this", `builder_list_methods` tells Claude to call it "BEFORE writing builder code so you never guess at a method name." When editing descriptions, preserve this directive style; they are the only documentation the upstream Claude sees.
-
-Two tools have non-trivial logic beyond a single HTTP call and are worth understanding before editing:
-
-- **`scene_validate`** — accepts either `key` (validate the saved scene) or inline `scene_js` (preview without saving). If only `key` is given it fetches the scene's JS first; if `story_js` is omitted it fetches the current story-wide JS so the validation matches what the editor would actually run.
-- **`story_export`** — the webapp returns three different payload shapes per `format` (`mvsj` string, `mvsx` base64, `folder` map). The handler dispatches on `res.format`, writes to `out_dir` if given (creating subdirs for folder exports, base64-decoding for mvsx), and otherwise returns a size summary to avoid dumping large content back through the MCP channel.
-
-### Environment
-
-- `MVS_DEV_URL` — base URL of the webapp. Defaults to `http://localhost:3000`.
-
-Register the built binary with a Claude client by absolute path, e.g.
-
-```bash
-claude mcp add mvs -- node /absolute/path/to/mol-view-stories/@mol-view-stories/mcp-server/dist/index.js
-```
+- The client echoes `Mcp-Session-Id` on every request after `initialize`, which
+  is what makes the MCP session usable as the dev-store key.
+- `initialize` never carries an inbound session id, so each client process gets a
+  fresh story unless pinned with `MVS_DEV_TOKEN` / an `Authorization` header.
+- Notifications must get **202 with an empty body**; a JSON-RPC envelope hangs.
+- The client opens a `GET` for SSE and follows 308 redirects on POST with body
+  and headers intact.

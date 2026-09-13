@@ -17,6 +17,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { randomBytes } from 'node:crypto';
+import { dropStory } from '@/lib/dev-store';
 
 const SESSION_TTL_MS = 24 * 60 * 60 * 1000; // 24h idle
 
@@ -36,9 +37,26 @@ export interface SessionInfo {
   lastSeenAt: number;
 }
 
+/**
+ * Drop sessions past the idle TTL, and the stories they were holding.
+ *
+ * touchSession() only expires a session when someone asks for it again, which
+ * never happens for an abandoned one. Minting is the natural place to sweep:
+ * it is the only operation whose frequency tracks how fast the map grows.
+ */
+function sweepExpired(now: number): void {
+  for (const [id, s] of sessions) {
+    if (now - s.lastSeenAt > SESSION_TTL_MS) {
+      sessions.delete(id);
+      dropStory(id);
+    }
+  }
+}
+
 export function mintSession(): SessionInfo {
   const id = randomBytes(24).toString('base64url');
   const now = Date.now();
+  sweepExpired(now);
   sessions.set(id, { createdAt: now, lastSeenAt: now });
   return { id, createdAt: now, lastSeenAt: now };
 }
@@ -49,6 +67,7 @@ export function touchSession(id: string): boolean {
   const now = Date.now();
   if (now - s.lastSeenAt > SESSION_TTL_MS) {
     sessions.delete(id);
+    dropStory(id);
     return false;
   }
   s.lastSeenAt = now;
@@ -57,6 +76,7 @@ export function touchSession(id: string): boolean {
 
 export function revokeSession(id: string): void {
   sessions.delete(id);
+  dropStory(id);
 }
 
 export type RequireSessionResult = { sessionId: string } | { error: NextResponse };
