@@ -181,6 +181,14 @@ function FileUploadZone() {
       'application/x-map': ['.map'],
       'application/x-dx': ['.dx'],
       'application/x-dxbin': ['.dxbin'],
+      // Surface meshes, consumed by the MVS `shape` node. None of these have a
+      // registered MIME type, so the extension entry is what actually matches;
+      // the keys follow the made-up 'application/x-*' style used above. Keep
+      // them off 'application/octet-stream' — that key already carries .bcif
+      // and a duplicate literal key would silently discard one of the two.
+      'application/x-vtp': ['.vtp'],
+      'application/x-ply': ['.ply'],
+      'application/x-obj': ['.obj'],
       // Images
       'image/png': ['.png'],
       'image/jpeg': ['.jpg', '.jpeg'],
@@ -216,6 +224,7 @@ function FileUploadZone() {
                   Molecular: Structure (mmCIF, CIF, PDB, BCIF, MOL, SDF, XYZ, GRO, MOL2), Coordinates (LAMMPSTRJ, XTC),
                   Volumes (MAP, DX, DXBIN)
                 </li>
+                <li>Surface meshes: VTP, PLY, OBJ</li>
                 <li>Media: Images (PNG, JPG, GIF, WEBP), Audio (MP3, WAV, OGG)</li>
                 <li>Raw data: JSON</li>
               </ul>
