@@ -5,8 +5,7 @@ import './globals.css';
 import { Inter } from 'next/font/google';
 import { Providers } from './providers';
 import { Toaster } from '@/components/ui/sonner';
-import { DevSyncMount } from '@/components/DevSyncMount';
-import { DevSyncListener } from '@/components/DevSyncListener';
+import { DevSyncGate } from '@/components/DevSyncGate';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -16,12 +15,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <title>Mol View Stories</title>
       <body className={inter.className}>
         <Providers>
-          {process.env.NEXT_PUBLIC_DEV_API === '1' && (
-            <>
-              <DevSyncMount />
-              <DevSyncListener />
-            </>
-          )}
+          {process.env.NEXT_PUBLIC_DEV_API === '1' && <DevSyncGate />}
           {children}
           <Toaster />
         </Providers>

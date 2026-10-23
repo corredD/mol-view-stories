@@ -19,13 +19,16 @@ import {
 import { Terminal, Download } from 'lucide-react';
 import { StartMcpDialog } from './StartMcpDialog';
 import { InstallMcpDialog } from './InstallMcpDialog';
+import { useDevApiAvailable } from '@/lib/dev-availability';
 
 export function McpMenu() {
   const [showStartMcp, setShowStartMcp] = useState(false);
   const [showInstallMcp, setShowInstallMcp] = useState(false);
   const devApiEnabled = process.env.NEXT_PUBLIC_DEV_API === '1';
+  // Hidden until the dev API answers, e.g. for visitors outside the network the proxy allows.
+  const devApiAvailable = useDevApiAvailable();
 
-  if (!devApiEnabled) return null;
+  if (!devApiEnabled || !devApiAvailable) return null;
 
   return (
     <>
